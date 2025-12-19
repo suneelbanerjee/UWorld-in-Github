@@ -6,7 +6,20 @@ from aqt.qt import *
 from aqt.utils import showText, tooltip
 
 # ============================================================
-# 0) CRITICAL: Chromium Flags for Speed
+# 0) COMPATIBILITY FIX: Qt5 vs Qt6 Enums
+#    (Fixes 'Qt' has no attribute 'LeftDockWidgetArea' error)
+# ============================================================
+try:
+    # Qt6 / PyQt6 (Newer Anki)
+    DOCK_LEFT = Qt.DockWidgetArea.LeftDockWidgetArea
+    DOCK_RIGHT = Qt.DockWidgetArea.RightDockWidgetArea
+except AttributeError:
+    # Qt5 / PyQt5 (Older Anki)
+    DOCK_LEFT = Qt.LeftDockWidgetArea
+    DOCK_RIGHT = Qt.RightDockWidgetArea
+
+# ============================================================
+# 1) Chromium Flags for Speed
 # ============================================================
 os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
     "--disable-background-timer-throttling "
@@ -17,7 +30,7 @@ os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
 )
 
 # ============================================================
-# 1) WebEngine Compatibility & GLOBAL PROFILE
+# 2) WebEngine Compatibility & GLOBAL PROFILE
 # ============================================================
 UWORLD_GLOBAL_PROFILE = None
 
@@ -77,7 +90,7 @@ def get_global_profile():
     return UWORLD_GLOBAL_PROFILE
 
 # ============================================================
-# 2) Result Dialog
+# 3) Result Dialog
 # ============================================================
 class ScanResultDialog(QDialog):
     def __init__(self, ids, parent=None):
@@ -107,13 +120,14 @@ class ScanResultDialog(QDialog):
         self.setLayout(layout)
 
 # ============================================================
-# 3) The UWorld Dock
+# 4) The UWorld Dock
 # ============================================================
 class UWorldDock(QDockWidget):
     def __init__(self, parent=None):
         super().__init__("UWorld", parent)
         self.setObjectName("UWorldDock")
-        self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        # [FIX] Use the compatibility variables we defined at the top
+        self.setAllowedAreas(DOCK_LEFT | DOCK_RIGHT)
         self.setMinimumWidth(450)
 
         container = QWidget()
@@ -170,7 +184,6 @@ class UWorldDock(QDockWidget):
                     // 3. REGEX TARGETING:
                     // Look for: [Digits] [Space] [Dash] [Space] [Digits]
                     // Capturing group (parentheses) around the SECOND number.
-                    // Handles dash (-), en-dash (–), em-dash (—) just in case.
                     let match = text.match(/\d+\s*[-–—]\s*(\d+)/);
                     
                     if (match && match[1]) {
@@ -195,14 +208,15 @@ class UWorldPage(QWebEnginePage):
     def createWindow(self, t): return self
 
 # ============================================================
-# 4) Menu & Init
+# 5) Menu & Init
 # ============================================================
 uworld_dock = None
 def toggle_sidebar():
     global uworld_dock
     if not uworld_dock:
         uworld_dock = UWorldDock(mw)
-        mw.addDockWidget(Qt.RightDockWidgetArea, uworld_dock)
+        # [FIX] Use DOCK_RIGHT compatibility variable
+        mw.addDockWidget(DOCK_RIGHT, uworld_dock)
         uworld_dock.setFloating(False)
     uworld_dock.setVisible(not uworld_dock.isVisible())
 

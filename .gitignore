@@ -3,6 +3,7 @@
 user_data/
 uworld_data/
 Anki_UWorld_Data/
+.DS_Store
 
 # --- Python Garbage ---
 __pycache__/

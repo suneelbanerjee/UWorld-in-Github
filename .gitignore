@@ -1,2 +1,19 @@
-uworld_data/
+# --- UWorld Helper Data (Login Sessions & Cache) ---
+# Critical: Never commit these folders
 user_data/
+uworld_data/
+Anki_UWorld_Data/
+
+# --- Python Garbage ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Mac OS Garbage ---
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# --- Optional: Anki Meta ---
+# You can uncomment this if you don't want to share your local add-on ID
+# meta.json

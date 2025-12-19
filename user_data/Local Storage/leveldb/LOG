@@ -1,6 +1,0 @@
-2025/12/19-13:35:49.097 c503 Reusing MANIFEST /Users/neel/Library/Application Support/Anki2/addons21/uworld_performance/user_data/Local Storage/leveldb/MANIFEST-000001
-2025/12/19-13:35:49.097 c503 Recovering log #7
-2025/12/19-13:35:49.098 c503 Reusing old log /Users/neel/Library/Application Support/Anki2/addons21/uworld_performance/user_data/Local Storage/leveldb/000007.log 
-2025/12/19-13:36:02.829 c503 Level-0 table #11: started
-2025/12/19-13:36:02.837 c503 Level-0 table #11: 164548 bytes OK
-2025/12/19-13:36:02.846 c503 Delete type=0 #7

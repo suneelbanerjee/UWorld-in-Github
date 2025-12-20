@@ -63,7 +63,7 @@ def get_global_profile():
 
     data_dir = get_data_dir()
 
-    UWORLD_GLOBAL_PROFILE = QWebEngineProfile("UWorld_Disk_Auth", mw)
+    UWORLD_GLOBAL_PROFILE = QWebEngineProfile("UWorld_Disk_Auth_v2", mw)
     UWORLD_GLOBAL_PROFILE.setPersistentStoragePath(data_dir)
     UWORLD_GLOBAL_PROFILE.setCachePath(data_dir)
     

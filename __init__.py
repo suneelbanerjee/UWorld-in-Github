@@ -7,7 +7,6 @@ from aqt.utils import showText, tooltip
 
 # ============================================================
 # 0) COMPATIBILITY FIX: Qt5 vs Qt6 Enums
-#    (Fixes 'Qt' has no attribute 'LeftDockWidgetArea' error)
 # ============================================================
 try:
     # Qt6 / PyQt6 (Newer Anki)
@@ -45,11 +44,16 @@ except ImportError:
         QWebEnginePage = None
         QWebEngineProfile = None
 
+def get_data_dir():
+    """Returns the path to the user_data folder."""
+    addon_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(addon_dir, "user_data")
+    if not os.path.exists(data_dir):
+        try: os.makedirs(data_dir)
+        except: pass
+    return data_dir
+
 def get_global_profile():
-    """
-    Creates a SINGLE persistent profile enforced with Disk Caching.
-    Compatible with both Qt5 and Qt6.
-    """
     global UWORLD_GLOBAL_PROFILE
     if UWORLD_GLOBAL_PROFILE is not None:
         return UWORLD_GLOBAL_PROFILE
@@ -57,51 +61,32 @@ def get_global_profile():
     if not QWebEngineProfile:
         return None
 
-    # 1. Storage Path: Inside the Add-on folder (cleaner & reliable)
-    addon_dir = os.path.dirname(os.path.abspath(__file__))
-    data_dir = os.path.join(addon_dir, "user_data")
-    if not os.path.exists(data_dir):
-        try: os.makedirs(data_dir)
-        except: pass
+    data_dir = get_data_dir()
 
-    # 2. Create Profile attached to MW
     UWORLD_GLOBAL_PROFILE = QWebEngineProfile("UWorld_Disk_Auth", mw)
-    
-    # 3. FORCE DISK PERSISTENCE
     UWORLD_GLOBAL_PROFILE.setPersistentStoragePath(data_dir)
     UWORLD_GLOBAL_PROFILE.setCachePath(data_dir)
     
-    # --- COMPATIBILITY FIX: WebEngine Enums (Qt5 vs Qt6) ---
-    # Qt6 nests enums (e.g. HttpCacheType.DiskHttpCache)
-    # Qt5 puts them on the class (e.g. DiskHttpCache)
-    
-    # 3a. Cache Type
+    # Compat: Cache Type
     try:
-        # Qt6
         cache_type = QWebEngineProfile.HttpCacheType.DiskHttpCache
         UWORLD_GLOBAL_PROFILE.setHttpCacheType(cache_type)
     except AttributeError:
         try:
-            # Qt5
             cache_type = QWebEngineProfile.DiskHttpCache
             UWORLD_GLOBAL_PROFILE.setHttpCacheType(cache_type)
-        except AttributeError:
-            pass # Should not happen, but safe fallback
+        except AttributeError: pass
 
-    # 3b. Persistent Cookies Policy
+    # Compat: Cookie Policy
     try:
-        # Qt6
         cookie_policy = QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies
         UWORLD_GLOBAL_PROFILE.setPersistentCookiesPolicy(cookie_policy)
     except AttributeError:
         try:
-            # Qt5
             cookie_policy = QWebEngineProfile.ForcePersistentCookies
             UWORLD_GLOBAL_PROFILE.setPersistentCookiesPolicy(cookie_policy)
-        except AttributeError:
-            pass
+        except AttributeError: pass
 
-    # 4. User Agent & Settings
     ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     UWORLD_GLOBAL_PROFILE.setHttpUserAgent(ua)
     
@@ -114,7 +99,50 @@ def get_global_profile():
     return UWORLD_GLOBAL_PROFILE
 
 # ============================================================
-# 3) Result Dialog
+# 3) File I/O for Correct Questions
+# ============================================================
+def save_correct_ids_to_file(new_ids):
+    """
+    Reads existing correct IDs from file, merges with new ones, 
+    and saves back to 'correct_questions.txt'.
+    """
+    if not new_ids:
+        return 0
+
+    data_dir = get_data_dir()
+    file_path = os.path.join(data_dir, "correct_questions.txt")
+    
+    existing_ids = set()
+    
+    # 1. Read existing file if it exists
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                # Split by commas, strip whitespace, ignore empties
+                items = [x.strip() for x in content.split(",") if x.strip().isdigit()]
+                existing_ids.update(items)
+        except Exception as e:
+            print(f"[UWorld Helper] Error reading correct IDs file: {e}")
+
+    # 2. Add new IDs
+    original_count = len(existing_ids)
+    existing_ids.update(new_ids)
+    added_count = len(existing_ids) - original_count
+    
+    # 3. Write back to file (Sorted, Comma Separated)
+    try:
+        sorted_list = sorted(list(existing_ids), key=lambda x: int(x))
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(", ".join(sorted_list))
+        print(f"[UWorld Helper] Saved {len(sorted_list)} correct IDs to {file_path}")
+    except Exception as e:
+        print(f"[UWorld Helper] Error writing correct IDs file: {e}")
+        
+    return added_count
+
+# ============================================================
+# 4) Result Dialog
 # ============================================================
 class ScanResultDialog(QDialog):
     def __init__(self, ids, parent=None):
@@ -126,7 +154,6 @@ class ScanResultDialog(QDialog):
         layout.addWidget(QLabel(f"Found <b>{len(ids)}</b> Missed Question IDs:"))
         
         self.text_area = QTextEdit()
-        # Sort numerically
         sorted_ids = sorted(list(ids), key=lambda x: int(x) if x.isdigit() else 0)
         self.text_area.setPlainText(", ".join(sorted_ids))
         layout.addWidget(self.text_area)
@@ -144,16 +171,15 @@ class ScanResultDialog(QDialog):
         self.setLayout(layout)
 
 # ============================================================
-# 4) The UWorld Dock
+# 5) The UWorld Dock
 # ============================================================
 class UWorldDock(QDockWidget):
     def __init__(self, parent=None):
         super().__init__("UWorld", parent)
         self.setObjectName("UWorldDock")
-        # [COMPAT FIX] Use the variables we defined at the top
         self.setAllowedAreas(DOCK_LEFT | DOCK_RIGHT)
         self.setMinimumWidth(450)
-
+        
         container = QWidget()
         self.setWidget(container)
         
@@ -169,13 +195,10 @@ class UWorldDock(QDockWidget):
 
         if QWebEngineView:
             self.web_view = QWebEngineView()
-            
-            # 1. Get Global Profile
             self.profile = get_global_profile()
             self.page = UWorldPage(self.profile, self.web_view)
             self.web_view.setPage(self.page)
             
-            # 2. DELAYED START: Wait 1.5s, then load Login
             QTimer.singleShot(1500, self.load_initial_url)
             
             b_back.clicked.connect(self.web_view.back)
@@ -191,55 +214,78 @@ class UWorldDock(QDockWidget):
         self.web_view.setUrl(url)
 
     def run_scan(self):
-        # NEW STRATEGY: Look specifically for the "Index - QID" pattern (e.g. "2 - 92")
-        # and capture ONLY the number after the dash.
+        # Scans for both Incorrect (.fa-times) and Correct (.fa-check)
         js_code = r"""
         (function() {
-            let missedIDs = [];
-            // 1. Find the "Red X" icons
-            let icons = document.querySelectorAll('.fa-times');
-            
-            icons.forEach(icon => {
-                // 2. Find the row
-                let row = icon.closest('tr') || icon.closest('.mat-row') || icon.closest('[role="row"]');
-                if (row) {
-                    let text = row.innerText;
-                    
-                    // 3. REGEX TARGETING:
-                    // Look for: [Digits] [Space] [Dash] [Space] [Digits]
-                    // Capturing group (parentheses) around the SECOND number.
-                    let match = text.match(/\d+\s*[-–—]\s*(\d+)/);
-                    
-                    if (match && match[1]) {
-                         // match[1] is the QID (the part after the dash)
-                         missedIDs.push(match[1]);
+            let result = { missed: [], correct: [] };
+
+            function getIDs(selector) {
+                let ids = [];
+                document.querySelectorAll(selector).forEach(icon => {
+                    let row = icon.closest('tr') || icon.closest('.mat-row') || icon.closest('[role="row"]');
+                    if (row) {
+                        let text = row.innerText;
+                        // Regex: Capture digits after the dash (e.g. "2 - 92" -> "92")
+                        let match = text.match(/\d+\s*[-–—]\s*(\d+)/);
+                        if (match && match[1]) {
+                             ids.push(match[1]);
+                        }
                     }
-                }
-            });
-            return [...new Set(missedIDs)];
+                });
+                return [...new Set(ids)];
+            }
+
+            // 1. Get Incorrect (Red X)
+            result.missed = getIDs('.fa-times');
+            
+            // 2. Get Correct (Green Check)
+            result.correct = getIDs('.fa-check');
+
+            return result;
         })();
         """
         self.web_view.page().runJavaScript(js_code, self.process_results)
 
-    def process_results(self, ids):
-        if not ids:
-            tooltip("Scan complete. No 'Incorrect' markers found.")
+    def process_results(self, data):
+        if not data:
+            tooltip("Scan complete. No data found.")
             return
-        ScanResultDialog(ids, mw).exec()
+
+        missed = data.get('missed', [])
+        correct = data.get('correct', [])
+
+        # PERSIST CORRECT IDs TO FILE
+        added = save_correct_ids_to_file(correct)
+        
+        # Determine tooltip message
+        msg = []
+        if missed:
+            msg.append(f"Found {len(missed)} missed.")
+        else:
+            msg.append("No missed questions.")
+            
+        if correct:
+            msg.append(f"Saved {len(correct)} correct ({added} new).")
+        
+        # Show tooltip with summary
+        tooltip("\n".join(msg))
+
+        # Only show the Copy Dialog if there are missed questions
+        if missed:
+            ScanResultDialog(missed, mw).exec()
 
 class UWorldPage(QWebEnginePage):
     def acceptNavigationRequest(self, u, t, m): return True
     def createWindow(self, t): return self
 
 # ============================================================
-# 5) Menu & Init
+# 6) Menu & Init
 # ============================================================
 uworld_dock = None
 def toggle_sidebar():
     global uworld_dock
     if not uworld_dock:
         uworld_dock = UWorldDock(mw)
-        # [COMPAT FIX] Use DOCK_RIGHT
         mw.addDockWidget(DOCK_RIGHT, uworld_dock)
         uworld_dock.setFloating(False)
     uworld_dock.setVisible(not uworld_dock.isVisible())

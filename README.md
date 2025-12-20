@@ -14,11 +14,10 @@
 
 ## 📥 Installation
 
-1.  **Download** this repository (Code -> Download ZIP) and extract it.
+1.  **Download** this repository (Code -> Download ZIP).
 2.  Open Anki and go to **Tools** -> **Add-ons** -> **View Files**.
-3.  Create a new folder named `UW_Helper`.
-4.  Paste the `__init__.py` file (and the `user_data` folder if present) into that new folder.
-5.  **Restart Anki**.
+3.  Extract the zip to the add-ons directory.
+4.  **Restart Anki**.
 
 ## 🛠️ Usage
 

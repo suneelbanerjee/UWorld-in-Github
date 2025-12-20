@@ -288,11 +288,18 @@ def toggle_sidebar():
         uworld_dock = UWorldDock(mw)
         mw.addDockWidget(DOCK_RIGHT, uworld_dock)
         uworld_dock.setFloating(False)
-    uworld_dock.setVisible(not uworld_dock.isVisible())
+    
+    # Simple toggle logic
+    if uworld_dock.isVisible():
+        uworld_dock.hide()
+    else:
+        uworld_dock.show()
 
 def perform_scan():
-    if uworld_dock and uworld_dock.isVisible(): uworld_dock.run_scan()
-    else: tooltip("Open sidebar first.")
+    if uworld_dock and uworld_dock.isVisible():
+        uworld_dock.run_scan()
+    else:
+        tooltip("Open sidebar first.")
 
 uw_menu = None
 for action in mw.form.menuTools.actions():
@@ -300,6 +307,17 @@ for action in mw.form.menuTools.actions():
 if not uw_menu: uw_menu = mw.form.menuTools.addMenu("UWorld Helper")
 
 uw_menu.clear()
-uw_menu.addAction(QAction("Toggle Sidebar", mw, triggered=toggle_sidebar))
+
+# 1. Toggle Sidebar
+action_toggle = QAction("Toggle Sidebar", mw)
+action_toggle.triggered.connect(toggle_sidebar)
+uw_menu.addAction(action_toggle)
+
 uw_menu.addSeparator()
-uw_menu.addAction(QAction("Scan for Missed Questions", mw, triggered=perform_scan))
+
+# 2. Scan Test Results (Renamed + Shortcut)
+action_scan = QAction("Scan Test Results", mw)
+# Qt automatically maps "Ctrl" to "Command" on macOS
+action_scan.setShortcut(QKeySequence("Ctrl+Shift+S"))
+action_scan.triggered.connect(perform_scan)
+uw_menu.addAction(action_scan)

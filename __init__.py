@@ -48,7 +48,7 @@ except ImportError:
 def get_global_profile():
     """
     Creates a SINGLE persistent profile enforced with Disk Caching.
-    This ensures login cookies are saved and loaded correctly every time.
+    Compatible with both Qt5 and Qt6.
     """
     global UWORLD_GLOBAL_PROFILE
     if UWORLD_GLOBAL_PROFILE is not None:
@@ -71,11 +71,35 @@ def get_global_profile():
     UWORLD_GLOBAL_PROFILE.setPersistentStoragePath(data_dir)
     UWORLD_GLOBAL_PROFILE.setCachePath(data_dir)
     
-    if hasattr(QWebEngineProfile.HttpCacheType, "DiskHttpCache"):
-        UWORLD_GLOBAL_PROFILE.setHttpCacheType(QWebEngineProfile.HttpCacheType.DiskHttpCache)
+    # --- COMPATIBILITY FIX: WebEngine Enums (Qt5 vs Qt6) ---
+    # Qt6 nests enums (e.g. HttpCacheType.DiskHttpCache)
+    # Qt5 puts them on the class (e.g. DiskHttpCache)
     
-    if hasattr(QWebEngineProfile.PersistentCookiesPolicy, "ForcePersistentCookies"):
-        UWORLD_GLOBAL_PROFILE.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies)
+    # 3a. Cache Type
+    try:
+        # Qt6
+        cache_type = QWebEngineProfile.HttpCacheType.DiskHttpCache
+        UWORLD_GLOBAL_PROFILE.setHttpCacheType(cache_type)
+    except AttributeError:
+        try:
+            # Qt5
+            cache_type = QWebEngineProfile.DiskHttpCache
+            UWORLD_GLOBAL_PROFILE.setHttpCacheType(cache_type)
+        except AttributeError:
+            pass # Should not happen, but safe fallback
+
+    # 3b. Persistent Cookies Policy
+    try:
+        # Qt6
+        cookie_policy = QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies
+        UWORLD_GLOBAL_PROFILE.setPersistentCookiesPolicy(cookie_policy)
+    except AttributeError:
+        try:
+            # Qt5
+            cookie_policy = QWebEngineProfile.ForcePersistentCookies
+            UWORLD_GLOBAL_PROFILE.setPersistentCookiesPolicy(cookie_policy)
+        except AttributeError:
+            pass
 
     # 4. User Agent & Settings
     ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -126,7 +150,7 @@ class UWorldDock(QDockWidget):
     def __init__(self, parent=None):
         super().__init__("UWorld", parent)
         self.setObjectName("UWorldDock")
-        # [FIX] Use the compatibility variables we defined at the top
+        # [COMPAT FIX] Use the variables we defined at the top
         self.setAllowedAreas(DOCK_LEFT | DOCK_RIGHT)
         self.setMinimumWidth(450)
 
@@ -215,7 +239,7 @@ def toggle_sidebar():
     global uworld_dock
     if not uworld_dock:
         uworld_dock = UWorldDock(mw)
-        # [FIX] Use DOCK_RIGHT compatibility variable
+        # [COMPAT FIX] Use DOCK_RIGHT
         mw.addDockWidget(DOCK_RIGHT, uworld_dock)
         uworld_dock.setFloating(False)
     uworld_dock.setVisible(not uworld_dock.isVisible())
